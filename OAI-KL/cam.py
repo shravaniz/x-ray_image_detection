@@ -58,6 +58,21 @@ elif args.model_type == 'shufflenet_v2_x2_0':
     model_ft.load_state_dict(torch.load('./Grad CAM/1fold_epoch14.pt'))
     target_layers = [model_ft.conv5]    
     image_size_tuple = (224, 224)
+
+elif args.model_type == 'vit_b_16':
+    model_ft.load_state_dict(torch.load('./Grad CAM/vit_b_16.pt'))
+    target_layers = [model_ft.encoder.layers[-1].ln_1]
+    image_size_tuple = (224, 224)
+
+elif args.model_type == 'swin_s':
+    model_ft.load_state_dict(torch.load('./Grad CAM/swin_s.pt'))
+    target_layers = [model_ft.features[-1]]
+    image_size_tuple = (224, 224)
+
+elif args.model_type == 'swin_v2_s':
+    model_ft.load_state_dict(torch.load('./Grad CAM/swin_v2_s.pt'))
+    target_layers = [model_ft.features[-1]]
+    image_size_tuple = (224, 224)
     
 model_ft.eval()
 

@@ -5,6 +5,7 @@ __pycache__
 .DS_Store
 
 # Dataset / Models / Submissions
+KneeXrayData/
 OAI-KL/KneeXray
 OAI-KL/models
 OAI-KL/submission

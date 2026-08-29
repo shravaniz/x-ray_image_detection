@@ -156,7 +156,7 @@ if __name__ == '__main__':
     train_dataset = ImageDataset(train_csv, transforms=train_transform)
     val_dataset = ImageDataset(train_csv, transforms=val_transform)
     
-    batch_size = 16
+    batch_size = 8  # Reduced from 16 to fit 4GB VRAM
     epochs = 30
     k = 5
     torch.manual_seed(42)
