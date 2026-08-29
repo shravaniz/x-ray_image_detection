@@ -9,6 +9,7 @@ KneeXrayData/
 OAI-KL/KneeXray
 OAI-KL/models
 OAI-KL/submission
+OAI-KL/.venv/
 
 OAI-KL/Grad CAM
 OAI-KL/Ensemble Network Box Plot
