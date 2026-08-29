@@ -64,7 +64,7 @@ graph TD
     Hard --> Output
 ```
 
-![alt text](./image/architecture.png)
+
 
 ## Training strategy
 The training process involves the following steps:
