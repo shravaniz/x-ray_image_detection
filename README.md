@@ -27,6 +27,43 @@ The ensemble network consists of several deep learning models spanning both Conv
 
 Each model is trained with optimal image sizes to enhance performance. The models leverage pre-trained weights from [`torchvision.models`](https://pytorch.org/vision/stable/models.html) and [`timm`](https://github.com/huggingface/pytorch-image-models). Combining the local feature extraction of CNNs with the global self-attention mechanisms of Vision Transformers allows the ensemble to effectively capture both fine-grained knee joint details and overall anatomical structure. The final prediction is made using a mix voting method, which combines hard and soft voting strategies.
 
+```mermaid
+graph TD
+    Input[Knee X-Ray Image] --> CNNs[Convolutional Neural Networks]
+    Input --> ViT[Vision Transformer - ViT-B/16]
+    Input --> Swin[Swin Transformers - Swin-S & Swin-V2-S]
+
+    subgraph CNN_Branch [CNN Models]
+        CNNs --> C1[DenseNet-161 / ResNet-101 / Wide-ResNet-50]
+        CNNs --> C2[EfficientNet-b5 / EfficientNet-V2-s]
+        CNNs --> C3[RegNet-Y-8GF / ResNeXt-50 / ShuffleNet-V2]
+    end
+
+    subgraph ViT_Branch [Vision Transformer Layers]
+        ViT --> V1[16x16 Non-Overlapping Patch Projection]
+        V1 --> V2[Positional Encoding]
+        V2 --> V3[Multi-Head Self-Attention Encoders]
+    end
+
+    subgraph Swin_Branch [Swin Transformer Layers]
+        Swin --> S1[Patch Partitioning & Linear Embedding]
+        S1 --> S2[Shifted Window Self-Attention - W-MSA / SW-MSA]
+        S2 --> S3[Patch Merging & Hierarchical Feature Maps]
+    end
+
+    C1 --> Logits[Model Classifier Heads]
+    C2 --> Logits
+    C3 --> Logits
+    V3 --> Logits
+    S3 --> Logits
+
+    Logits --> Ensemble[Mix Voting Strategy]
+    Ensemble --> Soft[Soft Voting - Avg Probabilities]
+    Ensemble --> Hard[Hard Voting - Majority Class]
+    Soft --> Output[Final KL Grade Prediction 0-4]
+    Hard --> Output
+```
+
 ![alt text](./image/architecture.png)
 
 ## Training strategy
@@ -35,18 +72,6 @@ The training process involves the following steps:
 2. The initial layers are frozen, and only the fully connected layers are trained with a learning rate of 0.01.
 3. Subsequently, all layers are unfrozen, and the learning rate is reduced progressively to stabilize training.
 4. Stratified five-fold cross-validation is used to handle class imbalance and improve generalization.
-
-## Results
-The proposed ensemble network achieved:
-- Accuracy: 76.93%
-- F1 Score: 0.7665
-
-These results outperform existing techniques in KL grade classification. Detailed experimental results and performance metrics are provided in the [paper](https://www.nature.com/articles/s41598-023-50210-4).
-
-## Visualization
-Grad-CAM visualization is used to understand the focus areas of the model. The visualization helps in verifying that the model correctly identifies key features related to KL grading, such as joint space narrowing and osteophyte formation.
-
-![alt text](./image/cam.png)
 
 ## License
 Ensemble deep‐learning networks for automated osteoarthritis grading in knee X‐ray image is released under the [MIT License](LICENSE).
