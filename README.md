@@ -12,7 +12,7 @@ Osteoarthritis (OA) is a common joint disease that affects millions of people wo
 The dataset used in this study is from the Osteoarthritis Initiative (OAI), which consists of 8260 knee X-ray images. The dataset includes images for KL grades ranging from 0 to 4. It is publicly available and can be accessed [here](https://data.mendeley.com/datasets/56rmx5bjcr/1).
 
 ## Model architecture
-The ensemble network consists of several deep learning models, including:
+The ensemble network consists of several deep learning models spanning both Convolutional Neural Networks (CNNs) and Vision Transformers (ViTs), including:
 - DenseNet-161
 - EfficientNet-b5
 - EfficientNet-V2-s
@@ -21,8 +21,11 @@ The ensemble network consists of several deep learning models, including:
 - ResNext-50-32x4d
 - Wide-ResNet-50-2
 - ShuffleNet-V2-x2-0
+- Vision Transformer (ViT-B/16)
+- Swin Transformer (Swin-S)
+- Swin Transformer V2 (Swin-V2-S)
 
-Each model is trained with optimal image sizes to enhance performance. The models are imported from [`torchvision.models`](https://pytorch.org/vision/stable/models.html) to leverage pre-trained weights and architectures. The final prediction is made using a mix voting method, which combines hard and soft voting strategies.
+Each model is trained with optimal image sizes to enhance performance. The models leverage pre-trained weights from [`torchvision.models`](https://pytorch.org/vision/stable/models.html) and [`timm`](https://github.com/huggingface/pytorch-image-models). Combining the local feature extraction of CNNs with the global self-attention mechanisms of Vision Transformers allows the ensemble to effectively capture both fine-grained knee joint details and overall anatomical structure. The final prediction is made using a mix voting method, which combines hard and soft voting strategies.
 
 ![alt text](./image/architecture.png)
 
