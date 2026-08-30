@@ -1,6 +1,7 @@
 # import ssl
 # ssl._create_default_https_context = ssl._create_unverified_context
 import argparse
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -11,18 +12,19 @@ from tqdm import tqdm
 import cv2
 import albumentations as A
 from albumentations.pytorch.transforms import ToTensorV2
-from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
+from sklearn.metrics import accuracy_score, cohen_kappa_score, f1_score, precision_score, recall_score
 from sklearn.model_selection import StratifiedKFold
 
 import torch
 from torch import nn, optim
 # from torch.nn import functional as F
 from torch.utils.data import DataLoader, SubsetRandomSampler
-from torch.optim.lr_scheduler import StepLR, MultiStepLR
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 from dataset import ImageDataset
 from early_stop import EarlyStopping
 from model import model_return
+from ordinal_loss import OrdinalCrossEntropyLoss
 # from my_custom_loss import my_ce_mse_loss
 
 def train_for_kfold(model, dataloader, criterion, optimizer, scheduler, device, fold, epoch):
@@ -71,11 +73,13 @@ def val_for_kfold(model, dataloader, criterion, device, fold, epoch):
         'precision_macro': precision_score(targets, predictions, average='macro', zero_division=0),
         'recall_macro': recall_score(targets, predictions, average='macro', zero_division=0),
         'f1_macro': f1_score(targets, predictions, average='macro', zero_division=0),
+        'qwk': cohen_kappa_score(targets, predictions, weights='quadratic'),
     }
     metrics['dice_macro'] = metrics['f1_macro']
     return val_loss, metrics
 
-def train(train_dataset, val_dataset, args, batch_size, epochs, k, splits, labels, foldperf, device):
+def train(train_dataset, val_dataset, args, batch_size, epochs, k, splits, labels, foldperf, device, metrics_path):
+    metric_rows = []
     for fold, (train_idx, val_idx) in enumerate(splits.split(np.arange(len(train_dataset)), labels), start=1):
         print(f"\n{'=' * 16} Fold {fold}/{k} {'=' * 16}")
         print(f"Training samples: {len(train_idx)} | Validation samples: {len(val_idx)}")
@@ -94,11 +98,12 @@ def train(train_dataset, val_dataset, args, batch_size, epochs, k, splits, label
             class_counts = np.bincount(train_labels, minlength=5)
             class_weights = torch.tensor(len(train_labels) / (5 * class_counts), dtype=torch.float32, device=device)
             print(f"Class weights: {class_weights.cpu().numpy().round(3).tolist()}")
-        criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=0.1) # Loss Function
-        # criterion = nn.MSELoss()
-        # criterion = my_ce_mse_loss
+        if args.loss == 'ordinal':
+            criterion = OrdinalCrossEntropyLoss(weight=class_weights, label_smoothing=0.1, emd_weight=args.emd_weight)
+        else:
+            criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=0.1)
 
-        optimizer = optim.Adam(filter(lambda p: p.requires_grad, model_ft.parameters()), lr=0.01) # Optimizer
+        optimizer = optim.Adam(filter(lambda p: p.requires_grad, model_ft.parameters()), lr=args.head_lr)
         scheduler = None
 
         if device.type == 'cuda' and torch.cuda.device_count() > 1:
@@ -115,9 +120,8 @@ def train(train_dataset, val_dataset, args, batch_size, epochs, k, splits, label
                 for param in model_ft.parameters():
                     param.requires_grad=True
 
-                optimizer = optim.Adam(filter(lambda p: p.requires_grad,model_ft.parameters()), weight_decay=0.0001, lr=0.001)
-                # scheduler = StepLR(optimizer, step_size=100, gamma=0.1)
-                scheduler = MultiStepLR(optimizer, milestones=[2], gamma=0.1)
+                optimizer = optim.Adam(filter(lambda p: p.requires_grad, model_ft.parameters()), weight_decay=0.0001, lr=args.finetune_lr)
+                scheduler = CosineAnnealingLR(optimizer, T_max=max(1, epochs - 1))
 
             print(f"Learning Rate : {optimizer.param_groups[0]['lr']}")
 
@@ -131,7 +135,7 @@ def train(train_dataset, val_dataset, args, batch_size, epochs, k, splits, label
                 f"Epoch: {epoch}/{epochs} | Train Loss: {train_loss:.3f} | Valid Loss: {val_loss:.3f} | "
                 f"Accuracy: {val_metrics['accuracy']:.3f} | Precision (macro): {val_metrics['precision_macro']:.3f} | "
                 f"Recall (macro): {val_metrics['recall_macro']:.3f} | F1 (macro): {val_metrics['f1_macro']:.3f} | "
-                f"Dice (macro): {val_metrics['dice_macro']:.3f}"
+                f"Dice (macro): {val_metrics['dice_macro']:.3f} | QWK: {val_metrics['qwk']:.3f}"
             )
 
             history['train_loss'].append(train_loss)
@@ -139,6 +143,17 @@ def train(train_dataset, val_dataset, args, batch_size, epochs, k, splits, label
             history['val_metrics'].append(val_metrics)
 
             early_stopping(val_loss, model_ft, args, fold, epoch)
+            metric_rows.append({
+                'fold': fold,
+                'epoch': epoch,
+                'learning_rate': optimizer.param_groups[0]['lr'],
+                'train_loss': train_loss,
+                'valid_loss': val_loss,
+                **val_metrics,
+                'early_stopping_counter': early_stopping.counter,
+                'early_stopped': early_stopping.early_stop,
+            })
+            pd.DataFrame(metric_rows).to_csv(metrics_path, index=False)
             if early_stopping.early_stop:
                 print("Early stopping")
                 break
@@ -146,7 +161,7 @@ def train(train_dataset, val_dataset, args, batch_size, epochs, k, splits, label
         foldperf[f"fold{fold}"] = history
 
     tl_f, vall_f = [], []
-    metric_names = ['accuracy', 'precision_macro', 'recall_macro', 'f1_macro', 'dice_macro']
+    metric_names = ['accuracy', 'precision_macro', 'recall_macro', 'f1_macro', 'dice_macro', 'qwk']
     final_metrics = {metric_name: [] for metric_name in metric_names}
 
     for f in range(1, k+1):
@@ -158,13 +173,21 @@ def train(train_dataset, val_dataset, args, batch_size, epochs, k, splits, label
     print()
     print(f"Performance of {k} Fold Cross Validation")
     print(f"Avg Train Loss: {np.mean(tl_f):.3f} \t Avg Valid Loss: {np.mean(vall_f):.3f}")
+    summary = {
+        'folds': k,
+        'avg_train_loss': float(np.mean(tl_f)),
+        'avg_valid_loss': float(np.mean(vall_f)),
+        **{f'final_{metric_name}': float(np.mean(values)) for metric_name, values in final_metrics.items()},
+    }
     print(
         f"Final Validation Accuracy: {np.mean(final_metrics['accuracy']):.3f} | "
         f"Precision (macro): {np.mean(final_metrics['precision_macro']):.3f} | "
         f"Recall (macro): {np.mean(final_metrics['recall_macro']):.3f} | "
         f"F1 (macro): {np.mean(final_metrics['f1_macro']):.3f} | "
-        f"Dice (macro): {np.mean(final_metrics['dice_macro']):.3f}"
+        f"Dice (macro): {np.mean(final_metrics['dice_macro']):.3f} | "
+        f"QWK: {np.mean(final_metrics['qwk']):.3f}"
     )
+    return summary
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -181,10 +204,15 @@ if __name__ == '__main__':
     parser.add_argument('--folds', type=int, default=5)
     parser.add_argument('--workers', type=int, default=0)
     parser.add_argument('--class-weighting', choices=['balanced', 'none'], default='balanced')
+    parser.add_argument('--loss', choices=['ce', 'ordinal'], default='ce')
+    parser.add_argument('--emd-weight', type=float, default=1.0)
+    parser.add_argument('--head-lr', type=float, default=0.01)
+    parser.add_argument('--finetune-lr', type=float, default=0.0001)
     parser.add_argument('--patience', type=int, default=7)
     parser.add_argument('--early-stopping-delta', type=float, default=0.0)
     parser.add_argument('--eval-batch-size', type=int, default=32)
     parser.add_argument('--skip-test-evaluation', action='store_true')
+    parser.add_argument('--ensemble-with', nargs='*', default=[], metavar='MODEL:IMAGE_SIZE')
     args = parser.parse_args()
 
     if args.device == 'cuda' and not torch.cuda.is_available():
@@ -219,6 +247,10 @@ if __name__ == '__main__':
     if stale_checkpoints:
         print(f"Removed {len(stale_checkpoints)} stale best checkpoint(s).")
 
+    results_dir = Path('./results') / args.model_type / str(image_size_tuple)
+    results_dir.mkdir(parents=True, exist_ok=True)
+    metrics_path = results_dir / 'training_metrics.csv'
+
     train_transform = A.Compose([
                     A.Resize(args.image_size, args.image_size, interpolation=cv2.INTER_CUBIC, p=1),
                     # A.RandomCrop(height=int(384*0.8), width=int(384*0.8), p=1),
@@ -245,17 +277,39 @@ if __name__ == '__main__':
     labels = train_dataset.get_labels()
     foldperf = {}
 
-    train(train_dataset, val_dataset, args, batch_size, epochs, k, splits, labels, foldperf, device)
+    summary = train(train_dataset, val_dataset, args, batch_size, epochs, k, splits, labels, foldperf, device, metrics_path)
+    summary.update({
+        'model_type': args.model_type,
+        'image_size': args.image_size,
+        'device': str(device),
+        'batch_size': args.batch_size,
+        'epochs_requested': args.epochs,
+        'class_weighting': args.class_weighting,
+        'loss': args.loss,
+    })
+    with (results_dir / 'training_summary.json').open('w', encoding='utf-8') as summary_file:
+        json.dump(summary, summary_file, indent=2)
+    print(f"Training metrics saved to {metrics_path}")
+    print(f"Training summary saved to {results_dir / 'training_summary.json'}")
 
     if not args.skip_test_evaluation:
         print("\nStarting held-out test evaluation...")
-        evaluate_command = [
-            sys.executable,
-            str(Path(__file__).with_name('evaluate.py')),
-            '--model-type', args.model_type,
-            '--image-size', str(args.image_size),
+        if args.ensemble_with:
+            evaluate_command = [
+                sys.executable,
+                str(Path(__file__).with_name('evaluate_ensemble.py')),
+                '--members', f'{args.model_type}:{args.image_size}', *args.ensemble_with,
+            ]
+        else:
+            evaluate_command = [
+                sys.executable,
+                str(Path(__file__).with_name('evaluate.py')),
+                '--model-type', args.model_type,
+                '--image-size', str(args.image_size),
+            ]
+        evaluate_command.extend([
             '--device', args.device,
             '--batch-size', str(args.eval_batch_size),
             '--workers', str(args.workers),
-        ]
+        ])
         subprocess.run(evaluate_command, check=True)

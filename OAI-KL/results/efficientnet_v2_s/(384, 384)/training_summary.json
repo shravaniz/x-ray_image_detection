@@ -1,0 +1,18 @@
+{
+  "folds": 5,
+  "avg_train_loss": 1.129677919920292,
+  "avg_valid_loss": 1.3503936944910564,
+  "final_accuracy": 0.6870884824518042,
+  "final_precision_macro": 0.7140997162739822,
+  "final_recall_macro": 0.6986287684622967,
+  "final_f1_macro": 0.703590280407719,
+  "final_dice_macro": 0.703590280407719,
+  "final_qwk": 0.834711201816822,
+  "model_type": "efficientnet_v2_s",
+  "image_size": 384,
+  "device": "cuda",
+  "batch_size": 8,
+  "epochs_requested": 30,
+  "class_weighting": "none",
+  "loss": "ordinal"
+}

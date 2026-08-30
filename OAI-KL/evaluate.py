@@ -1,4 +1,5 @@
 import argparse
+import json
 from pathlib import Path
 
 import albumentations as A
@@ -6,7 +7,7 @@ from albumentations.pytorch.transforms import ToTensorV2
 import cv2
 import numpy as np
 import pandas as pd
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, f1_score
+from sklearn.metrics import accuracy_score, classification_report, cohen_kappa_score, confusion_matrix, f1_score, precision_score, recall_score
 import torch
 from torch.utils.data import DataLoader
 
@@ -80,14 +81,27 @@ def main():
 
     targets = test_csv['label'].to_numpy()
     predictions = ensemble_probabilities.argmax(axis=1)
-    accuracy = accuracy_score(targets, predictions)
-    macro_f1 = f1_score(targets, predictions, average='macro')
-    print(f'Accuracy: {accuracy:.4f}')
-    print(f'Macro F1: {macro_f1:.4f}')
+    metrics = {
+        'accuracy': accuracy_score(targets, predictions),
+        'precision_macro': precision_score(targets, predictions, average='macro', zero_division=0),
+        'recall_macro': recall_score(targets, predictions, average='macro', zero_division=0),
+        'f1_macro': f1_score(targets, predictions, average='macro', zero_division=0),
+        'qwk': cohen_kappa_score(targets, predictions, weights='quadratic'),
+    }
+    metrics['dice_macro'] = metrics['f1_macro']
+    print(f"Accuracy: {metrics['accuracy']:.4f}")
+    print(f"Precision (macro): {metrics['precision_macro']:.4f}")
+    print(f"Recall (macro): {metrics['recall_macro']:.4f}")
+    print(f"Macro F1 / Dice: {metrics['f1_macro']:.4f}")
+    print(f"Quadratic weighted kappa: {metrics['qwk']:.4f}")
+    report = classification_report(targets, predictions, labels=range(5), digits=4, zero_division=0, output_dict=True)
     print(classification_report(targets, predictions, labels=range(5), digits=4, zero_division=0))
 
     results_dir = Path('./results') / args.model_type / str(image_size)
     results_dir.mkdir(parents=True, exist_ok=True)
+    with (results_dir / 'test_metrics.json').open('w', encoding='utf-8') as metrics_file:
+        json.dump(metrics, metrics_file, indent=2)
+    pd.DataFrame(report).transpose().to_csv(results_dir / 'classification_report.csv')
     pd.DataFrame(confusion_matrix(targets, predictions, labels=range(5)), index=range(5), columns=range(5)).to_csv(results_dir / 'confusion_matrix.csv')
     pd.DataFrame({
         'data': test_csv['data'],
