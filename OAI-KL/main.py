@@ -2,6 +2,8 @@
 # ssl._create_default_https_context = ssl._create_unverified_context
 import argparse
 from pathlib import Path
+import subprocess
+import sys
 
 import numpy as np
 import pandas as pd
@@ -181,6 +183,8 @@ if __name__ == '__main__':
     parser.add_argument('--class-weighting', choices=['balanced', 'none'], default='balanced')
     parser.add_argument('--patience', type=int, default=7)
     parser.add_argument('--early-stopping-delta', type=float, default=0.0)
+    parser.add_argument('--eval-batch-size', type=int, default=32)
+    parser.add_argument('--skip-test-evaluation', action='store_true')
     args = parser.parse_args()
 
     if args.device == 'cuda' and not torch.cuda.is_available():
@@ -207,6 +211,13 @@ if __name__ == '__main__':
     print(f"Device : {device}")
     print(f"Training images : {len(train_csv)}")
     print(f"Cross-validation : {args.folds} folds x up to {args.epochs} epochs")
+
+    checkpoint_dir = Path('./models') / args.model_type / str(image_size_tuple)
+    stale_checkpoints = list(checkpoint_dir.glob('*fold_best.pt'))
+    for checkpoint_path in stale_checkpoints:
+        checkpoint_path.unlink()
+    if stale_checkpoints:
+        print(f"Removed {len(stale_checkpoints)} stale best checkpoint(s).")
 
     train_transform = A.Compose([
                     A.Resize(args.image_size, args.image_size, interpolation=cv2.INTER_CUBIC, p=1),
@@ -235,3 +246,16 @@ if __name__ == '__main__':
     foldperf = {}
 
     train(train_dataset, val_dataset, args, batch_size, epochs, k, splits, labels, foldperf, device)
+
+    if not args.skip_test_evaluation:
+        print("\nStarting held-out test evaluation...")
+        evaluate_command = [
+            sys.executable,
+            str(Path(__file__).with_name('evaluate.py')),
+            '--model-type', args.model_type,
+            '--image-size', str(args.image_size),
+            '--device', args.device,
+            '--batch-size', str(args.eval_batch_size),
+            '--workers', str(args.workers),
+        ]
+        subprocess.run(evaluate_command, check=True)
