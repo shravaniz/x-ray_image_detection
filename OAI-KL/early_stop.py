@@ -33,27 +33,23 @@ class EarlyStopping:
         save_path = f'./models/{args.model_type}/{image_size_tuple}'
         os.makedirs(save_path, exist_ok=True)
 
+        checkpoint_path = f'{save_path}/{fold}fold_best.pt'
         if isinstance(model, nn.DataParallel):
-            torch.save(model.module.state_dict(), f'{save_path}/{fold}fold_epoch{epoch}.pt')
+            torch.save(model.module.state_dict(), checkpoint_path)
         else:
-            torch.save(model.state_dict(), f'{save_path}/{fold}fold_epoch{epoch}.pt')
-        # torch.save(model, f"./models/{args.model_type}/{image_size_tuple}/{fold}fold_epoch{epoch}.pt")
+            torch.save(model.state_dict(), checkpoint_path)
             
         self.val_loss_min = val_loss
         
     def __call__(self, val_loss, model, args, fold, epoch):
         score = -val_loss
 
-        if self.best_score is None:
+        if self.best_score is None or score > self.best_score + self.delta:
             self.best_score = score
             self.save_checkpoint(val_loss, model, args, fold, epoch)
-        elif self.best_score - self.delta > score:
+            self.counter = 0
+        else:
             self.counter += 1
             print(f"EarlyStopping counter: {self.counter} out of {self.patience}")
             if self.counter >= self.patience:
                 self.early_stop = True
-        else:
-            if self.best_score < score:
-                self.best_score = score
-            self.save_checkpoint(val_loss, model, args, fold, epoch)
-            self.counter = 0
