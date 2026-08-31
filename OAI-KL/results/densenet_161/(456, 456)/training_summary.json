@@ -1,16 +1,18 @@
 {
-  "folds": 2,
-  "avg_train_loss": 1.3115187388373124,
-  "avg_valid_loss": 1.3560409482355826,
-  "final_accuracy": 0.6211491865697474,
-  "final_precision_macro": 0.6267652930992335,
-  "final_recall_macro": 0.5809430454061075,
-  "final_f1_macro": 0.557265943631388,
-  "final_dice_macro": 0.557265943631388,
+  "folds": 5,
+  "avg_train_loss": 1.2089820978123924,
+  "avg_valid_loss": 1.3879142103263873,
+  "final_accuracy": 0.6793016671909405,
+  "final_precision_macro": 0.6875827113332573,
+  "final_recall_macro": 0.6778386808923788,
+  "final_f1_macro": 0.6757565238488775,
+  "final_dice_macro": 0.6757565238488775,
+  "final_qwk": 0.8216080796385488,
   "model_type": "densenet_161",
   "image_size": 456,
   "device": "cuda",
   "batch_size": 8,
   "epochs_requested": 30,
-  "class_weighting": "none"
+  "class_weighting": "none",
+  "loss": "ordinal"
 }
