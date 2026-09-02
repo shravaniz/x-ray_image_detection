@@ -6,13 +6,18 @@ import sys
 
 CNN_MODELS = [
     ('efficientnet_v2_s', 384),
+    ('efficientnet_b5', 456),
     ('densenet_161', 456),
     ('resnet_101', 456),
+    ('resnext_50_32x4d', 224),
+    ('wide_resnet_50_2', 224),
+    ('regnet_y_8gf', 224),
+    ('shufflenet_v2_x2_0', 224),
 ]
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Train three CNN baselines and evaluate their soft-voting ensemble.')
+    parser = argparse.ArgumentParser(description='Train the CNN baselines and evaluate their soft-voting ensemble.')
     parser.add_argument('--data-dir', type=Path, default=Path('../KneeXrayData/ClsKLData/kneeKL299'))
     parser.add_argument('--device', default='cuda', choices=['cuda', 'cpu'])
     parser.add_argument('--batch-size', type=int, default=8)

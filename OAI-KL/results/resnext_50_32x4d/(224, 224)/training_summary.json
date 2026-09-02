@@ -1,0 +1,18 @@
+{
+  "folds": 5,
+  "avg_train_loss": 1.2285426281954812,
+  "avg_valid_loss": 1.4750516429099583,
+  "final_accuracy": 0.6540339130304528,
+  "final_precision_macro": 0.6859079415810047,
+  "final_recall_macro": 0.6548372317367226,
+  "final_f1_macro": 0.6668565868464644,
+  "final_dice_macro": 0.6668565868464644,
+  "final_qwk": 0.7962691601025645,
+  "model_type": "resnext_50_32x4d",
+  "image_size": 224,
+  "device": "cuda",
+  "batch_size": 8,
+  "epochs_requested": 30,
+  "class_weighting": "none",
+  "loss": "ordinal"
+}

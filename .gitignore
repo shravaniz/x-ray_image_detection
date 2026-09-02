@@ -4,6 +4,9 @@ __pycache__
 
 .DS_Store
 
+# Training run logs
+*.log
+
 # Dataset / Models / Submissions
 KneeXrayData/
 OAI-KL/KneeXray

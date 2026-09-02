@@ -1,0 +1,18 @@
+{
+  "folds": 5,
+  "avg_train_loss": 1.2266183951246774,
+  "avg_valid_loss": 1.4836643560954503,
+  "final_accuracy": 0.6351753321649515,
+  "final_precision_macro": 0.6832759385282717,
+  "final_recall_macro": 0.6452209194398092,
+  "final_f1_macro": 0.6558949643384446,
+  "final_dice_macro": 0.6558949643384446,
+  "final_qwk": 0.7856369503600215,
+  "model_type": "regnet_y_8gf",
+  "image_size": 224,
+  "device": "cuda",
+  "batch_size": 8,
+  "epochs_requested": 30,
+  "class_weighting": "none",
+  "loss": "ordinal"
+}
