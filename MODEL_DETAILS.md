@@ -16,8 +16,8 @@ All 8 models come from `torchvision.models` with ImageNet pretrained weights (`w
 | Property | Value |
 |----------|-------|
 | **Paper model #** | 1 |
-| **Command** | `python main.py -m densenet_161 -i 456` |
-| **Optimal input size** | 456×456 |
+| **Command** | `python main.py -m densenet_161 -i 512` |
+| **Optimal input size** | 512×512 |
 | **Parameters** | ~28.7M |
 | **Architecture family** | Densely Connected Convolutional Networks |
 | **Key feature** | Every layer connected to every other layer — feature reuse, strong gradient flow |
@@ -38,8 +38,8 @@ DenseNets excel at preserving fine-grained details through the network. For KL g
 | Property | Value |
 |----------|-------|
 | **Paper model #** | 2 |
-| **Command** | `python main.py -m efficientnet_b5 -i 456` |
-| **Optimal input size** | 456×456 |
+| **Command** | `python main.py -m efficientnet_b5 -i 448` |
+| **Optimal input size** | 448×448 |
 | **Parameters** | ~30M |
 | **Architecture family** | EfficientNet (compound scaling) |
 | **Key feature** | Balanced scaling of depth, width, and resolution |
@@ -60,8 +60,8 @@ Provides a different inductive bias than DenseNet/ResNet. NAS-designed architect
 | Property | Value |
 |----------|-------|
 | **Paper model #** | 3 |
-| **Command** | `python main.py -m efficientnet_v2_s -i 384` |
-| **Optimal input size** | 384×384 |
+| **Command** | `python main.py -m efficientnet_v2_s -i 456` |
+| **Optimal input size** | 456×456 |
 | **Parameters** | ~21M |
 | **Architecture family** | EfficientNet-V2 |
 | **Key feature** | Faster training, better than EfficientNet-V1, uses MBConv + Fused-MBConv |
@@ -82,8 +82,8 @@ Different variant of the EfficientNet family — captures different feature repr
 | Property | Value |
 |----------|-------|
 | **Paper model #** | 4 |
-| **Command** | `python main.py -m regnet_y_8gf -i 448` |
-| **Optimal input size** | 448×448 |
+| **Command** | `python main.py -m regnet_y_8gf -i 384` |
+| **Optimal input size** | 384×384 |
 | **Parameters** | ~39M |
 | **Architecture family** | RegNet (Regular Network) |
 | **Key feature** | Network design space with quantized linear parameterization |
@@ -104,8 +104,8 @@ Completely different design philosophy — not hand-crafted (like ResNet/DenseNe
 | Property | Value |
 |----------|-------|
 | **Paper model #** | 5 |
-| **Command** | `python main.py -m resnet_101 -i 456` |
-| **Optimal input size** | 456×456 |
+| **Command** | `python main.py -m resnet_101 -i 384` |
+| **Optimal input size** | 384×384 |
 | **Parameters** | ~44.5M |
 | **Architecture family** | Residual Networks |
 | **Key feature** | Skip connections — solves vanishing gradients in deep networks |
@@ -187,86 +187,18 @@ The lightweight option — only 7.4M parameters vs. 69M for Wide-ResNet. Lightwe
 
 ---
 
----
-
-## 9. Vision Transformer (ViT-B/16)
-
-| Property | Value |
-|----------|-------|
-| **Command** | `python main.py -m vit_b_16 -i 224` |
-| **Optimal input size** | 224×224 |
-| **Parameters** | ~86M |
-| **Architecture family** | Vision Transformer |
-| **Key feature** | Self-attention mechanism across non-overlapping 16x16 image patches |
-| **Head replacement** | `model_ft.heads.head` — `nn.Linear(768, 5)` |
-| **Target layer (Grad-CAM)** | `model_ft.encoder.layers[-1].ln_1` |
-| **Published year** | 2020 (ICLR 2021) |
-
-**How it works:**
-Splits images into sequences of 16x16 flattened patches, projects them into embeddings with positional encodings, and processes them through standard Transformer encoder blocks. Captures global interactions across the entire image from early stages.
-
-**Why it's in the ensemble:**
-Provides global self-attention feature representation, complementary to local inductive biases of CNNs.
-
----
-
-## 10. Swin Transformer (Swin-S)
-
-| Property | Value |
-|----------|-------|
-| **Command** | `python main.py -m swin_s -i 224` |
-| **Optimal input size** | 224×224 |
-| **Parameters** | ~50M |
-| **Architecture family** | Hierarchical Vision Transformer |
-| **Key feature** | Shifted window self-attention for hierarchical multi-scale feature maps |
-| **Head replacement** | `model_ft.head` — `nn.Linear(768, 5)` |
-| **Target layer (Grad-CAM)** | `model_ft.features[-1]` |
-| **Published year** | 2021 (ICCV Best Paper) |
-
-**How it works:**
-Computes self-attention within local non-overlapping windows and shifts windows between layers to allow cross-window connections, generating hierarchical representations like CNNs.
-
-**Why it's in the ensemble:**
-Combines the multiscale spatial feature hierarchy of CNNs with the flexible modeling power of self-attention.
-
----
-
-## 11. Swin Transformer V2 (Swin-V2-S)
-
-| Property | Value |
-|----------|-------|
-| **Command** | `python main.py -m swin_v2_s -i 224` |
-| **Optimal input size** | 224×224 |
-| **Parameters** | ~50M |
-| **Architecture family** | Hierarchical Vision Transformer |
-| **Key feature** | Post-normalization, log-CPB (continuous position bias), and residual-post-norm for stable scaling |
-| **Head replacement** | `model_ft.head` — `nn.Linear(768, 5)` |
-| **Target layer (Grad-CAM)** | `model_ft.features[-1]` |
-| **Published year** | 2022 (CVPR) |
-
-**How it works:**
-Enhances Swin Transformer with residual-post-norm and scaled cosine attention to improve stability and transferability across varied resolutions.
-
-**Why it's in the ensemble:**
-Improves fine-grained representation stability and joint detail extraction.
-
----
-
 ## Architecture Comparison
 
 | # | Model | Params | Input | Family | Key Innovation |
 |---|-------|--------|-------|--------|----------------|
-| 1 | DenseNet-161 | 28.7M | 456 | DenseNet | Dense connectivity — every layer sees all previous features |
-| 2 | EfficientNet-b5 | 30M | 456 | EfficientNet | NAS + compound scaling |
-| 3 | EfficientNet-V2-s | 21M | 384 | EfficientNet-V2 | Fused-MBConv + progressive learning |
-| 4 | RegNet-Y-8GF | 39M | 448 | RegNet | Design space parameterization |
-| 5 | ResNet-101 | 44.5M | 456 | ResNet | Residual (skip) connections |
+| 1 | DenseNet-161 | 28.7M | 512 | DenseNet | Dense connectivity — every layer sees all previous features |
+| 2 | EfficientNet-b5 | 30M | 448 | EfficientNet | NAS + compound scaling |
+| 3 | EfficientNet-V2-s | 21M | 456 | EfficientNet-V2 | Fused-MBConv + progressive learning |
+| 4 | RegNet-Y-8GF | 39M | 384 | RegNet | Design space parameterization |
+| 5 | ResNet-101 | 44.5M | 384 | ResNet | Residual (skip) connections |
 | 6 | ResNext-50-32x4d | 25M | 512 | ResNeXt | Grouped convolutions (cardinality) |
-| 7 | Wide-ResNet-50-2 | 68.9M | 512 | Wide-ResNet | Width over depth |
+| 7 | Wide-ResNet-50-2 | 68.9M | 456 | Wide-ResNet | Width over depth |
 | 8 | ShuffleNet-V2-x2-0 | 7.4M | 512 | ShuffleNet-V2 | Channel shuffle + practical efficiency |
-| 9 | ViT-B/16 | 86M | 224 | Vision Transformer | Patch-based global self-attention |
-| 10 | Swin-S | 50M | 224 | Swin Transformer | Shifted window hierarchical self-attention |
-| 11 | Swin-V2-S | 50M | 224 | Swin Transformer V2 | Log-CPB & scaled cosine attention |
 
 ## Input Size Rationale
 
@@ -274,9 +206,9 @@ The paper found that different architectures benefit from different input resolu
 
 | 384×384 | 448×448 | 456×456 | 512×512 |
 |---------|---------|---------|---------|
-| EfficientNet-V2-s | RegNet-Y-8GF | DenseNet-161 | ResNext-50-32x4d |
-| | | EfficientNet-b5 | Wide-ResNet-50-2 |
-| | | ResNet-101 | ShuffleNet-V2-x2-0 |
+| RegNet-Y-8GF | EfficientNet-b5 | EfficientNet-V2-s | DenseNet-161 |
+| ResNet-101 | | Wide-ResNet-50-2 | ResNext-50-32x4d |
+| | | | ShuffleNet-V2-x2-0 |
 
 **Why not one size for all?** Larger images capture more fine detail (osteophytes, joint space) but require more memory and compute. Each architecture's internal downsampling ratio and receptive field determine its optimal input size.
 
@@ -284,7 +216,7 @@ The paper found that different architectures benefit from different input resolu
 
 | Parameter | Value |
 |-----------|-------|
-| Batch size | 8 (reduced from 16 for 4GB VRAM) |
+| Batch size | 16 (paper's setting) |
 | Epochs | 30 (max, early stopping applies) |
 | Cross-validation | 5-fold stratified |
 | Loss | CrossEntropyLoss with label smoothing = 0.1 |

@@ -12,7 +12,7 @@ Osteoarthritis (OA) is a common joint disease that affects millions of people wo
 The dataset used in this study is from the Osteoarthritis Initiative (OAI), which consists of 8260 knee X-ray images. The dataset includes images for KL grades ranging from 0 to 4. It is publicly available and can be accessed [here](https://data.mendeley.com/datasets/56rmx5bjcr/1).
 
 ## Model architecture
-The ensemble network consists of several deep learning models spanning both Convolutional Neural Networks (CNNs) and Vision Transformers (ViTs), including:
+The ensemble network consists of eight Convolutional Neural Networks (CNNs):
 - DenseNet-161
 - EfficientNet-b5
 - EfficientNet-V2-s
@@ -21,17 +21,12 @@ The ensemble network consists of several deep learning models spanning both Conv
 - ResNext-50-32x4d
 - Wide-ResNet-50-2
 - ShuffleNet-V2-x2-0
-- Vision Transformer (ViT-B/16)
-- Swin Transformer (Swin-S)
-- Swin Transformer V2 (Swin-V2-S)
 
-Each model is trained with optimal image sizes to enhance performance. The models leverage pre-trained weights from [`torchvision.models`](https://pytorch.org/vision/stable/models.html) and [`timm`](https://github.com/huggingface/pytorch-image-models). Combining the local feature extraction of CNNs with the global self-attention mechanisms of Vision Transformers allows the ensemble to effectively capture both fine-grained knee joint details and overall anatomical structure. The final prediction is made using a mix voting method, which combines hard and soft voting strategies.
+Each model is trained with its optimal image size to enhance performance. The models leverage pre-trained weights from [`torchvision.models`](https://pytorch.org/vision/stable/models.html). Combining architectures with different inductive biases (dense connectivity, compound scaling, grouped convolutions, channel shuffling) allows the ensemble to effectively capture both fine-grained knee joint details and overall anatomical structure. The final prediction is made using a mix voting method, which combines hard and soft voting strategies.
 
 ```mermaid
 graph TD
-    Input[Knee X-Ray Image] --> CNNs[Convolutional Neural Networks]
-    Input --> ViT[Vision Transformer - ViT-B/16]
-    Input --> Swin[Swin Transformers - Swin-S & Swin-V2-S]
+    Input[Knee X-Ray Image] --> CNNs[8 Convolutional Neural Networks]
 
     subgraph CNN_Branch [CNN Models]
         CNNs --> C1[DenseNet-161 / ResNet-101 / Wide-ResNet-50]
@@ -39,23 +34,9 @@ graph TD
         CNNs --> C3[RegNet-Y-8GF / ResNeXt-50 / ShuffleNet-V2]
     end
 
-    subgraph ViT_Branch [Vision Transformer Layers]
-        ViT --> V1[16x16 Non-Overlapping Patch Projection]
-        V1 --> V2[Positional Encoding]
-        V2 --> V3[Multi-Head Self-Attention Encoders]
-    end
-
-    subgraph Swin_Branch [Swin Transformer Layers]
-        Swin --> S1[Patch Partitioning & Linear Embedding]
-        S1 --> S2[Shifted Window Self-Attention - W-MSA / SW-MSA]
-        S2 --> S3[Patch Merging & Hierarchical Feature Maps]
-    end
-
     C1 --> Logits[Model Classifier Heads]
     C2 --> Logits
     C3 --> Logits
-    V3 --> Logits
-    S3 --> Logits
 
     Logits --> Ensemble[Mix Voting Strategy]
     Ensemble --> Soft[Soft Voting - Avg Probabilities]

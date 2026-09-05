@@ -27,22 +27,19 @@ Classify knee osteoarthritis severity using the **Kellgren-Lawrence (KL) grading
 - **Resolutions:** 224×224 and 299×299 grayscale PNGs
 - **Naming:** `9003175L.png` / `9003175R.png` (left/right knee), `9003175_1.png` / `9003175_2.png` (auto-cropped)
 
-## Models (Hybrid Ensemble: CNNs + Transformers)
+## Models (8 CNN Ensemble — the paper's architectures)
 All from `torchvision.models` with pretrained ImageNet weights, final layer replaced with 5-class head:
 
 | # | Model | Type | Optimal Input Size |
 |---|-------|------|-------------------|
-| 1 | DenseNet-161 | CNN | 456×456 |
-| 2 | EfficientNet-b5 | CNN | 456×456 |
-| 3 | EfficientNet-V2-s | CNN | 384×384 |
-| 4 | RegNet-Y-8GF | CNN | 448×448 |
-| 5 | ResNet-101 | CNN | 456×456 |
+| 1 | DenseNet-161 | CNN | 512×512 |
+| 2 | EfficientNet-b5 | CNN | 448×448 |
+| 3 | EfficientNet-V2-s | CNN | 456×456 |
+| 4 | RegNet-Y-8GF | CNN | 384×384 |
+| 5 | ResNet-101 | CNN | 384×384 |
 | 6 | ResNext-50-32x4d | CNN | 512×512 |
 | 7 | Wide-ResNet-50-2 | CNN | 456×456 |
 | 8 | ShuffleNet-V2-x2-0 | CNN | 512×512 |
-| 9 | ViT-B/16 | Transformer | 224×224 |
-| 10 | Swin-S | Transformer | 224×224 |
-| 11 | Swin-V2-S | Transformer | 224×224 |
 
 ## Architecture (16 Python files in `OAI-KL/`)
 
@@ -99,12 +96,11 @@ All from `torchvision.models` with pretrained ImageNet weights, final layer repl
 
 ## Dependencies
 ```
-torch==2.0.0+cu117, torchvision==0.15.1+cu117
+torch (2.x, CUDA build), torchvision
 albumentations, pytorch_grad_cam, ttach (TTA)
 opencv-python, Pillow, pandas, numpy
 scikit-learn, matplotlib, natsort, tqdm
 optuna (hyperparameter search only)
-h5py (data loading)
 ```
 
 ## Data Directory Structure
@@ -127,7 +123,7 @@ KneeXrayData/KneeXrayData/
 ## CLI Usage Examples
 ```bash
 # Train a single model
-python main.py -m densenet_161 -i 456
+python main.py -m densenet_161 -i 512
 
 # Hyperparameter search
 python main_optuna.py -m resnet_101 -i 224
