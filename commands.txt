@@ -1,0 +1,8 @@
+python train_cnn_baseline_ensemble.py \
+  --data-dir /home/dumalkar/Documents/x-ray_image_detection/KneeXrayData/ClsKLData/kneeKL299 \
+  --device cuda --batch-size 32 --eval-batch-size 64 \
+  --folds 5 --epochs 20 --workers 4 --loss ce
+
+------------------------------------
+source /home/dumalkar/Documents/x-ray_image_detection/.venv/bin/activate
+
