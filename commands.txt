@@ -5,9 +5,16 @@ Repo   : https://github.com/shravaniz/x-ray_image_detection
 Paper  : https://doi.org/10.1038/s41598-023-50210-4  (Pi et al., Sci Rep 13:22887, 2023)
 Targets: 6-model mix voting 76.93% acc / 0.7665 F1 | 8-model mix voting 76.33% / 0.7640
 
-Windows / PowerShell commands. (The previous Linux commands for the other machine
-are preserved in git history, commit 4108e91.)
+Two size sets exist in this repo:
+  A) Paper Table-3 optimized (best square) sizes - used in the Windows commands below:
+     DenseNet-161 512 | EfficientNet-b5 448 | EfficientNet-V2-s 456 | RegNet-Y-8GF 384
+     ResNet-101 384 | ResNext-50-32x4d 512 | Wide-ResNet-50-2 456 | ShuffleNet-V2-x2-0 512
+  B) train_paper_ensemble.py OPTIMIZED_MODELS list (older MODEL_DETAILS.md sizes, + 3 ViTs).
 
+
+===============================================================================
+WINDOWS (PowerShell)
+===============================================================================
 
 1) ONE COMMAND - full pipeline (recommended)
 ---------------------------------------------
@@ -38,10 +45,6 @@ python main.py -m shufflenet_v2_x2_0 -i 512 --data-dir ../KneeXrayData/KneeXrayD
 $models = @(@('densenet_161',512), @('efficientnet_b5',448), @('efficientnet_v2_s',456), @('regnet_y_8gf',384), @('resnet_101',384), @('resnext_50_32x4d',512), @('wide_resnet_50_2',456), @('shufflenet_v2_x2_0',512))
 foreach ($m in $models) { python main.py -m $m[0] -i $m[1] --data-dir ../KneeXrayData/KneeXrayData/ClsKLData/kneeKL224/train --class-weighting none --skip-test-evaluation }
 
-Sizes are the paper's Table-3 optimized (best square) sizes:
-  DenseNet-161 512 | EfficientNet-b5 448 | EfficientNet-V2-s 456 | RegNet-Y-8GF 384
-  ResNet-101 384 | ResNext-50-32x4d 512 | Wide-ResNet-50-2 456 | ShuffleNet-V2-x2-0 512
-
 
 3) STEP BY STEP - TTA test predictions + per-model scores
 ---------------------------------------------------------
@@ -71,11 +74,64 @@ python test_ensemble.py
 # For the 8-model variant, also copy densenet_161/(512, 512) and wide_resnet_50_2/(456, 456).
 
 
-NOTES
------
+===============================================================================
+LINUX (bash)  - machine paths: /home/dumalkar/Documents/x-ray_image_detection
+===============================================================================
+
+# setup (once per shell)
+cd /home/dumalkar/Documents/x-ray_image_detection
+source .venv/bin/activate
+
+1) ONE COMMAND - native runner (trains 8 CNNs + 3 ViTs, then soft-vote ensemble)
+--------------------------------------------------------------------------------
+python train_paper_ensemble.py \
+  --data-dir KneeXrayData/ClsKLData/kneeKL299 \
+  --device cuda --batch-size 32 --eval-batch-size 64 \
+  --folds 5 --epochs 30 --workers 4
+
+2) STEP BY STEP - train all 8 CNNs at the paper's Table-3 sizes (size set A)
+----------------------------------------------------------------------------
+cd /home/dumalkar/Documents/x-ray_image_detection/OAI-KL
+
+for m in densenet_161:512 efficientnet_b5:448 efficientnet_v2_s:456 \
+         regnet_y_8gf:384 resnet_101:384 resnext_50_32x4d:512 \
+         wide_resnet_50_2:456 shufflenet_v2_x2_0:512; do
+  name="${m%%:*}"; size="${m##*:}"
+  python main.py -m "$name" -i "$size" \
+    --data-dir ../KneeXrayData/ClsKLData/kneeKL299/train \
+    --class-weighting none --skip-test-evaluation
+done
+
+3) STEP BY STEP - per-model evaluation + ensemble (soft voting)
+---------------------------------------------------------------
+# per-model held-out test metrics (averages the 5 {N}fold_best.pt checkpoints)
+for m in densenet_161:512 efficientnet_b5:448 efficientnet_v2_s:456 \
+         regnet_y_8gf:384 resnet_101:384 resnext_50_32x4d:512 \
+         wide_resnet_50_2:456 shufflenet_v2_x2_0:512; do
+  name="${m%%:*}"; size="${m##*:}"
+  python evaluate.py -m "$name" -i "$size" --data-dir ../KneeXrayData/ClsKLData/kneeKL299/test
+done
+
+# ensemble: paper's final 6 models (add densenet_161:512 wide_resnet_50_2:456 for 8)
+python evaluate_ensemble.py \
+  --members efficientnet_b5:448 efficientnet_v2_s:456 regnet_y_8gf:384 \
+           resnet_101:384 resnext_50_32x4d:512 shufflenet_v2_x2_0:512 \
+  --data-dir ../KneeXrayData/ClsKLData/kneeKL299/test
+
+# NOTE: hard/soft/mix voting via test_ensemble.py needs the ./KneeXray/train/train.csv and
+# ./KneeXray/test/test_correct.csv layout, which currently exists only on the Windows machine.
+# On Linux, evaluate_ensemble.py (soft voting) is the native flow.
+
+
+===============================================================================
+NOTES (both platforms)
+===============================================================================
 - main.py deletes existing *fold_best.pt when it starts a model: an interrupted model
   restarts from fold 1. run_pipeline.ps1 skips models whose 5 folds are complete.
-- GPU here is a Quadro T1000 (4 GB): batch size 8 (main.py default).
+- Windows GPU: Quadro T1000 (4 GB) -> batch size 8 (main.py default).
 - test_auto.py is idempotent (skips CSVs already generated).
 - Re-running test_ensemble.py without clearing ./submission/ would include its own
   previous outputs as ensemble members.
+- main.py's built-in post-training evaluation is skipped (--skip-test-evaluation) on
+  both platforms: evaluate.py's hardcoded default test path does not match either
+  machine. Use the explicit evaluate.py / evaluate_ensemble.py --data-dir instead.
