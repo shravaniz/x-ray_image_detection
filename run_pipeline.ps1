@@ -14,7 +14,8 @@ param(
     [switch]$All8,                       # ensemble with all 8 models (paper default: 6)
     [switch]$SkipTrain,                  # skip training for models that already have 5-fold checkpoints
     [switch]$SkipTest,                   # skip TTA inference entirely (use existing submission CSVs)
-    [double]$Threshold = 0.65            # score_auto printing threshold
+    [double]$Threshold = 0.65,           # score_auto printing threshold
+    [string]$DataDir = '../KneeXrayData/KneeXrayData/ClsKLData/kneeKL224/train'  # class folders 0..4 with PNGs
 )
 
 $ErrorActionPreference = 'Continue'
@@ -47,10 +48,12 @@ function Banner([string]$msg) {
 
 function FoldCheckpointsExist($m) {
     # training for a model counts as done only when all 5 folds have checkpoints
+    # (merged main.py saves {N}fold_best.pt; older runs may have {N}fold_epoch*.pt)
     $dir = "./models/$($m.Name)/($($m.Size), $($m.Size))"
     if (-not (Test-Path $dir)) { return $false }
     foreach ($f in 1..5) {
-        $count = (Get-ChildItem $dir -Filter "${f}fold_epoch*.pt" -ErrorAction SilentlyContinue | Measure-Object).Count
+        $count = (Get-ChildItem $dir -Filter "${f}fold_best.pt" -ErrorAction SilentlyContinue | Measure-Object).Count +
+                 (Get-ChildItem $dir -Filter "${f}fold_epoch*.pt" -ErrorAction SilentlyContinue | Measure-Object).Count
         if ($count -eq 0) { return $false }
     }
     return $true
@@ -65,7 +68,9 @@ if (-not $SkipTrain) {
             continue
         }
         Banner "Train: $($m.Name) @ $($m.Size)x$($m.Size)"
-        python main.py -m $m.Name -i $m.Size
+        # --skip-test-evaluation: main.py's built-in evaluate.py uses a hardcoded data path
+        # that does not match this machine; Stages 2-4 below handle test scoring instead.
+        python main.py -m $m.Name -i $m.Size --data-dir $DataDir --class-weighting none --skip-test-evaluation
         if ($LASTEXITCODE -ne 0) { Write-Host "WARNING: training exited with code $LASTEXITCODE" -ForegroundColor Red }
     }
 }
