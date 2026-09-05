@@ -1,8 +1,81 @@
-python train_cnn_baseline_ensemble.py \
-  --data-dir /home/dumalkar/Documents/x-ray_image_detection/KneeXrayData/ClsKLData/kneeKL299 \
-  --device cuda --batch-size 32 --eval-batch-size 64 \
-  --folds 5 --epochs 20 --workers 4 --loss ce
+Knee KL Grade Classification - Commands
+========================================
 
-------------------------------------
-source /home/dumalkar/Documents/x-ray_image_detection/.venv/bin/activate
+Repo   : https://github.com/shravaniz/x-ray_image_detection
+Paper  : https://doi.org/10.1038/s41598-023-50210-4  (Pi et al., Sci Rep 13:22887, 2023)
+Targets: 6-model mix voting 76.93% acc / 0.7665 F1 | 8-model mix voting 76.33% / 0.7640
 
+Windows / PowerShell commands. (The previous Linux commands for the other machine
+are preserved in git history, commit 4108e91.)
+
+
+1) ONE COMMAND - full pipeline (recommended)
+---------------------------------------------
+cd F:\Project\ensemble\Knee-KL-Grade-Classification
+.\run_pipeline.ps1                        # train 8 CNNs -> TTA test -> scores -> 6-model ensemble
+.\run_pipeline.ps1 -All8                  # ensemble with all 8 models
+.\run_pipeline.ps1 -SkipTrain             # resume: use existing checkpoints
+.\run_pipeline.ps1 -SkipTrain -SkipTest   # only re-score and re-ensemble
+
+If PowerShell blocks scripts:  powershell -ExecutionPolicy Bypass -File .\run_pipeline.ps1
+
+
+2) STEP BY STEP - train all 8 CNNs (run from OAI-KL folder)
+-----------------------------------------------------------
+cd F:\Project\ensemble\Knee-KL-Grade-Classification\OAI-KL
+
+# one model = 5-fold CV, checkpoints saved as ./models/<model>/(<size>, <size>)/{N}fold_best.pt
+python main.py -m densenet_161       -i 512 --data-dir ../KneeXrayData/KneeXrayData/ClsKLData/kneeKL224/train --class-weighting none --skip-test-evaluation
+python main.py -m efficientnet_b5    -i 448 --data-dir ../KneeXrayData/KneeXrayData/ClsKLData/kneeKL224/train --class-weighting none --skip-test-evaluation
+python main.py -m efficientnet_v2_s  -i 456 --data-dir ../KneeXrayData/KneeXrayData/ClsKLData/kneeKL224/train --class-weighting none --skip-test-evaluation
+python main.py -m regnet_y_8gf       -i 384 --data-dir ../KneeXrayData/KneeXrayData/ClsKLData/kneeKL224/train --class-weighting none --skip-test-evaluation
+python main.py -m resnet_101         -i 384 --data-dir ../KneeXrayData/KneeXrayData/ClsKLData/kneeKL224/train --class-weighting none --skip-test-evaluation
+python main.py -m resnext_50_32x4d   -i 512 --data-dir ../KneeXrayData/KneeXrayData/ClsKLData/kneeKL224/train --class-weighting none --skip-test-evaluation
+python main.py -m wide_resnet_50_2   -i 456 --data-dir ../KneeXrayData/KneeXrayData/ClsKLData/kneeKL224/train --class-weighting none --skip-test-evaluation
+python main.py -m shufflenet_v2_x2_0 -i 512 --data-dir ../KneeXrayData/KneeXrayData/ClsKLData/kneeKL224/train --class-weighting none --skip-test-evaluation
+
+# or as one PowerShell loop (same effect):
+$models = @(@('densenet_161',512), @('efficientnet_b5',448), @('efficientnet_v2_s',456), @('regnet_y_8gf',384), @('resnet_101',384), @('resnext_50_32x4d',512), @('wide_resnet_50_2',456), @('shufflenet_v2_x2_0',512))
+foreach ($m in $models) { python main.py -m $m[0] -i $m[1] --data-dir ../KneeXrayData/KneeXrayData/ClsKLData/kneeKL224/train --class-weighting none --skip-test-evaluation }
+
+Sizes are the paper's Table-3 optimized (best square) sizes:
+  DenseNet-161 512 | EfficientNet-b5 448 | EfficientNet-V2-s 456 | RegNet-Y-8GF 384
+  ResNet-101 384 | ResNext-50-32x4d 512 | Wide-ResNet-50-2 456 | ShuffleNet-V2-x2-0 512
+
+
+3) STEP BY STEP - TTA test predictions + per-model scores
+---------------------------------------------------------
+# TTA inference: one CSV per checkpoint -> ./submission/<model>/(<size>, <size>)/
+foreach ($m in $models) { python test_auto.py -m $m[0] -i $m[1] }
+
+# per-model accuracy / F1
+foreach ($m in $models) { python score_auto.py -m $m[0] -i $m[1] -t 0.65 }
+
+
+4) STEP BY STEP - ensemble (paper's final 6 models, mix voting)
+---------------------------------------------------------------
+# test_ensemble.py reads EVERY csv in the flat ./submission/ folder
+Remove-Item ./submission/*.csv -Force -ErrorAction SilentlyContinue
+Copy-Item "./submission/efficientnet_b5/(448, 448)/*.csv"    ./submission/
+Copy-Item "./submission/efficientnet_v2_s/(456, 456)/*.csv"  ./submission/
+Copy-Item "./submission/regnet_y_8gf/(384, 384)/*.csv"       ./submission/
+Copy-Item "./submission/resnet_101/(384, 384)/*.csv"         ./submission/
+Copy-Item "./submission/resnext_50_32x4d/(512, 512)/*.csv"   ./submission/
+Copy-Item "./submission/shufflenet_v2_x2_0/(512, 512)/*.csv" ./submission/
+python test_ensemble.py
+
+# outputs in ./submission/:
+#   10fold_epoch10_submission.csv = hard voting
+#   10fold_epoch11_submission.csv = soft voting
+#   10fold_epoch12_submission.csv = mix voting  <- paper's headline method (76.93% / 0.7665)
+# For the 8-model variant, also copy densenet_161/(512, 512) and wide_resnet_50_2/(456, 456).
+
+
+NOTES
+-----
+- main.py deletes existing *fold_best.pt when it starts a model: an interrupted model
+  restarts from fold 1. run_pipeline.ps1 skips models whose 5 folds are complete.
+- GPU here is a Quadro T1000 (4 GB): batch size 8 (main.py default).
+- test_auto.py is idempotent (skips CSVs already generated).
+- Re-running test_ensemble.py without clearing ./submission/ would include its own
+  previous outputs as ensemble members.
