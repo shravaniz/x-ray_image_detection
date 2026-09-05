@@ -1,39 +1,35 @@
-import glob
+# Adapted from the paper's make_csv.py (sunwxxpi/Knee-KL-Grade-Classification).
+# The paper's version globbed the author's own ./KneeXray/HH_1/ split; this builds
+# the same CSVs that main.py / test_auto.py / test_ensemble.py expect
+#   ./KneeXray/train/train.csv          <- train + val (6,604 images, paper's CV pool)
+#   ./KneeXray/test/test_correct.csv    <- test (1,656 images, paper's held-out set)
+# from the Mendeley OAI folder layout (data-dir/{train,val,test}/0..4/*.png).
+import argparse
+import os
+from pathlib import Path
 
 import pandas as pd
 
-a = glob.glob('./KneeXray/HH_1/0/'+'*.jpg') # glob.glob >> List 형식으로 반환
-a_label = ['0' for x in range(0, len(a), 1)]
-b = glob.glob('./KneeXray/HH_1/1/'+'*.jpg')
-b_label = ['1' for x in range(0, len(b), 1)]
-c = glob.glob('./KneeXray/HH_1/2/'+'*.jpg')
-c_label = ['2' for x in range(0, len(c), 1)]
-d = glob.glob('./KneeXray/HH_1/3/'+'*.jpg')
-d_label = ['3' for x in range(0, len(d), 1)]
-e = glob.glob('./KneeXray/HH_1/4/'+'*.jpg')
-e_label = ['4' for x in range(0, len(e), 1)]
+def build_csv(class_dirs, out_path):
+    data = []
+    label = []
+    for class_dir in class_dirs:
+        for grade in range(5):
+            for image_path in sorted((Path(class_dir) / str(grade)).glob('*')):
+                if image_path.suffix.lower() in ('.png', '.jpg'):
+                    data.append(str(image_path.resolve()))
+                    label.append(grade)
 
-file = a + b + c + d + e
-label = a_label + b_label + c_label + d_label + e_label
+    df = pd.DataFrame({'data': data, 'label': label})
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(out_path, index=False)
+    print(f"Saved {len(df)} rows to {out_path}")
 
-a = pd.DataFrame({'data':file, 'label':label})
-a.set_index('data', inplace=True) # 'data' 열을 Index로 설정 EXCEL A열로 붙임
-a.to_csv('./KneeXray/HH_1.csv')
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data-dir', default='../KneeXrayData/ClsKLData/kneeKL299', help='folder containing train/, val/, test/ class subfolders')
+    args = parser.parse_args()
 
-""" a = glob.glob('./KneeXray/test/0/'+'*.png')
-a_label = ['0' for x in range(0, len(a), 1)]
-b = glob.glob('./KneeXray/test/1/'+'*.png')
-b_label = ['1' for x in range(0, len(b), 1)]
-c = glob.glob('./KneeXray/test/2/'+'*.png')
-c_label = ['2' for x in range(0, len(c), 1)]
-d = glob.glob('./KneeXray/test/3/'+'*.png')
-d_label = ['3' for x in range(0, len(d), 1)]
-e = glob.glob('./KneeXray/test/4/'+'*.png')
-e_label = ['4' for x in range(0, len(e), 1)]
-
-file = a + b + c + d + e
-label = a_label + b_label + c_label + d_label + e_label
-
-a = pd.DataFrame({'data':file, 'label':label})
-a. set_index('data', inplace=True)
-a.to_csv('./KneeXray/Test_correct.csv') """
+    build_csv([f'{args.data_dir}/train', f'{args.data_dir}/val'], './KneeXray/train/train.csv')
+    build_csv([f'{args.data_dir}/test'], './KneeXray/test/test_correct.csv')

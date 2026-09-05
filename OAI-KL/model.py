@@ -2,7 +2,6 @@ from torch import nn
 from torchvision import models
 
 def model_return(args):
-    # --- CNN Architectures ---
     if args.model_type == 'resnet_101':
         model_ft = models.resnet101(weights='DEFAULT')
         in_ftrs = model_ft.fc.in_features
@@ -33,6 +32,16 @@ def model_return(args):
         for param in model_ft.fc.parameters():
             param.requires_grad = True
         
+    # elif args.model_type == 'densenet_169':
+    #     model_ft = models.densenet169(weights='DEFAULT')
+    #     in_ftrs = model_ft.classifier.in_features
+    #     model_ft.classifier = nn.Linear(in_ftrs, 5)
+    
+    # elif args.model_type == 'densenet_201':
+    #     model_ft = models.densenet201(weights='DEFAULT')
+    #     in_ftrs = model_ft.classifier.in_features
+    #     model_ft.classifier = nn.Linear(in_ftrs, 5)
+        
     elif args.model_type == 'densenet_161':
         model_ft = models.densenet161(weights='DEFAULT')
         in_ftrs = model_ft.classifier.in_features
@@ -42,6 +51,11 @@ def model_return(args):
             param.requires_grad = False
         for param in model_ft.classifier.parameters():
             param.requires_grad = True
+        
+    # elif args.model_type == 'efficientnet_b3':
+    #     model_ft = models.efficientnet_b3(weights='DEFAULT')
+    #     in_ftrs = model_ft.classifier[1].in_features
+    #     model_ft.classifier[1] = nn.Linear(in_ftrs, 5)
         
     elif args.model_type == 'efficientnet_b5':
         model_ft = models.efficientnet_b5(weights='DEFAULT')
@@ -82,36 +96,15 @@ def model_return(args):
             param.requires_grad = False
         for param in model_ft.fc.parameters():
             param.requires_grad = True
-
-    # --- Vision Transformer Architectures ---
-    elif args.model_type == 'vit_b_16':
-        model_ft = models.vit_b_16(weights='DEFAULT')
-        in_ftrs = model_ft.heads.head.in_features
-        model_ft.heads.head = nn.Linear(in_ftrs, 5)
         
-        for param in model_ft.parameters():
-            param.requires_grad = False
-        for param in model_ft.heads.head.parameters():
-            param.requires_grad = True
-
-    elif args.model_type == 'swin_s':
-        model_ft = models.swin_s(weights='DEFAULT')
-        in_ftrs = model_ft.head.in_features
-        model_ft.head = nn.Linear(in_ftrs, 5)
-        
-        for param in model_ft.parameters():
-            param.requires_grad = False
-        for param in model_ft.head.parameters():
-            param.requires_grad = True
-
-    elif args.model_type == 'swin_v2_s':
-        model_ft = models.swin_v2_s(weights='DEFAULT')
-        in_ftrs = model_ft.head.in_features
-        model_ft.head = nn.Linear(in_ftrs, 5)
-        
-        for param in model_ft.parameters():
-            param.requires_grad = False
-        for param in model_ft.head.parameters():
-            param.requires_grad = True
+    # elif args.model_type == 'inception_v3':
+    #     model_ft = models.inception_v3(weights='DEFAULT')
+    #     in_ftrs = model_ft.fc.in_features
+    #     model_ft.fc = nn.Linear(in_ftrs, 5)
+    
+    # elif args.model_type == 'PingJunChen_vgg_19':
+    #     model_ft = models.vgg19(weights='DEFAULT')
+    #     in_ftrs = model_ft.classifier[6].in_features
+    #     model_ft.classifier[6] = nn.Linear(in_ftrs, 5)
         
     return model_ft
